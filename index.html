@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>与 梦角 的聊天</title>
+    <style>
+        /* --- 基础重置 --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none; /* 防止长按选中文本 */
+        }
+
+        html, body {
+            height: 100%;
+            height: 100dvh; 
+            background-color: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden; 
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #EDEDED;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        }
+
+        /* --- 顶部导航 --- */
+        .header {
+            height: 50px;
+            background-color: #f7f7f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 15px;
+            border-bottom: 1px solid #E0E0E0;
+            flex-shrink: 0; 
+            z-index: 10;
+            position: relative;
+        }
+
+        .header-btn {
+            position: absolute;
+            right: 15px;
+            font-size: 14px;
+            color: #576b95;
+            cursor: pointer;
+            padding: 5px;
+            font-weight: 500;
+        }
+
+        .header-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* --- 聊天区域 --- */
+        .chat-container {
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            -webkit-overflow-scrolling: touch; 
+            background-color: #EDEDED; 
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .message-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            max-width: 100%;
+        }
+
+        .message-row.ta { flex-direction: row; }
+        .message-row.user { flex-direction: row-reverse; }
+
+        /* 头像 */
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: white;
+            font-weight: bold;
+            overflow: hidden; 
+            background-color: #ccc;
+        }
+        .avatar.ta { background-color: #6c9ef8; }
+        .avatar.user { background-color: #f8a36c; }
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 气泡 */
+        .bubble {
+            max-width: calc(100% - 100px);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            line-height: 1.4;
+            word-break: break-word;
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        
+        /* 按住时的反馈 */
+        .bubble:active {
+            filter: brightness(0.9);
+        }
+
+        .bubble.ta {
+            background-color: #FFFFFF;
+            color: #333;
+            border-top-left-radius: 2px;
+        }
+
+        .bubble.user {
+            background-color: #95EC69;
+            color: #333;
+            border-top-right-radius: 2px;
+        }
+
+        /* 气泡小三角 */
+        .bubble::before {
+            content: '';
+            position: absolute;
+            top: 12px;
+            width: 0;
+            height: 0;
+            border: 6px solid transparent;
+        }
+        .bubble.ta::before {
+            left: -10px;
+            border-right-color: #FFFFFF;
+        }
+        .bubble.user::before {
+            right: -10px;
+            border-left-color: #95EC69;
+        }
+
+        /* 引用区块样式 (气泡内) */
+        .quote-box {
+            background-color: rgba(0, 0, 0, 0.05);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 6px;
+            border-left: 2px solid #999;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        .typing-indicator {
+            display: none;
+            font-size: 12px;
+            color: #666;
+            margin-left: 50px;
+            padding-bottom: 5px;
+            text-shadow: 0 1px 2px #fff;
+        }
+
+        /* --- 底部输入区 --- */
+        .input-area {
+            background-color: #f7f7f7;
+            padding: 10px 12px;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+            display: flex;
+            flex-direction: column;
+            border-top: 1px solid #E0E0E0;
+            flex-shrink: 0; 
+            z-index: 10;
+        }
+
+        /* 输入框上方的引用预览区 */
+        .quote-preview {
+            display: none; /* 默认隐藏 */
+            background: #e5e5e5;
+            padding: 8px 10px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #666;
+            position: relative;
+            border-left: 3px solid #07C160;
+            padding-right: 30px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .quote-preview.active { display: block; }
+        .quote-preview .close-quote {
+            position: absolute;
+            right: 5px; top: 50%;
+            transform: translateY(-50%);
+            width: 20px; height: 20px;
+            text-align: center; line-height: 20px;
+            color: #999; font-size: 16px; cursor: pointer;
+        }
+
+        /* 输入区行 */
+        .input-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .input-box {
+            flex: 1;
+            background: #fff;
+            border-radius: 4px;
+            padding: 8px 12px;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            resize: none;
+            max-height: 100px;
+            line-height: 1.4;
+            font-family: inherit;
+        }
+
+        .send-btn {
+            background-color: #07C160;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-size: 15px;
+            cursor: pointer;
+            flex-shrink: 0;
+            height: 38px;
+        }
+        .send-btn:disabled { background-color: #ccc; }
+
+        /* --- 长按菜单样式 --- */
+        .action-menu-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.3);
+            display: none;
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+        }
+        .action-menu-overlay.active { display: flex; }
+
+        .action-menu {
+            background: #fff;
+            border-radius: 12px;
+            display: flex;
+            padding: 15px 20px;
+            gap: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            animation: popIn 0.15s ease-out;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .action-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #333;
+            font-size: 13px;
+        }
+        .action-item:active { opacity: 0.6; }
+
+        .action-icon {
+            width: 40px;
+            height: 40px;
+            background: #f5f5f5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .action-icon svg {
+            width: 22px; height: 22px;
+            fill: #333;
+        }
+
+        .action-item.delete { color: #ff3b30; }
+        .action-item.delete .action-icon { background: #ffebeb; }
+        .action-item.delete .action-icon svg { fill: #ff3b30; }
+
+        /* --- 弹窗/全屏页面通用样式 --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #f2f2f6; 
+            display: none;
+            z-index: 100;
+            justify-content: center;
+            flex-direction: column;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .settings-page {
+            width: 100%;
+            height: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: #f2f2f6;
+        }
+
+        .settings-header {
+            height: 50px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            border-bottom: 1px solid #E0E0E0;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 10;
+        }
+
+        .settings-header .back-btn {
+            font-size: 16px;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            z-index: 2;
+        }
+
+        .settings-header .back-btn svg {
+            width: 18px; height: 18px; fill: #333;
+        }
+
+        .settings-header h3 {
+            position: absolute;
+            left: 0; right: 0;
+            text-align: center;
+            font-size: 17px;
+            font-weight: 600;
+            color: #333;
+            pointer-events: none;
+        }
+
+        .settings-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 15px;
+        }
+
+        .setting-list {
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .setting-item:last-child { border-bottom: none; }
+        .setting-item:active { background: #f9f9f9; }
+
+        .setting-text { display: flex; flex-direction: column; gap: 4px; }
+        .setting-title { font-size: 16px; color: #333; font-weight: 500; }
+        .setting-subtitle { font-size: 13px; color: #00C795; }
+        
+        .setting-arrow {
+            color: #ccc;
+            font-size: 18px;
+            font-family: "Courier New", Courier, monospace;
+        }
+
+        /* 子页面 */
+        .sub-page {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #f2f2f6;
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .sub-page.active { transform: translateX(0); }
+
+        /* 表单组 */
+        .form-group {
+            background: #fff;
+            border-radius: 12px;
+            padding: 0 16px;
+            margin-bottom: 20px;
+        }
+        .form-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .form-row:last-child { border-bottom: none; }
+        .form-label { font-size: 15px; color: #333; width: 80px; }
+        .form-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 15px;
+            text-align: right;
+            background: transparent;
+            color: #333;
+        }
+        
+        /* 头像上传 */
+        .avatar-upload {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            background: #f0f0f0;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 12px;
+        }
+        .avatar-upload img { width: 100%; height: 100%; object-fit: cover; }
+        .avatar-upload input[type="file"] { 
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        /* 按钮 */
+        .btn-primary {
+            width: 100%;
+            background: #07C160;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        /* 字卡库样式 */
+        .card-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .card-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            background: #fff;
+        }
+        .add-card-btn {
+            background: #07C160;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0 20px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        .card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .card-item {
+            background: #fff;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .delete-card-btn {
+            color: #ff3b30;
+            font-size: 13px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        /* 批量导入框 */
+        .batch-import-box {
+            background: #fff;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .batch-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .batch-subtitle {
+            font-size: 13px;
+            color: #999;
+            margin-bottom: 12px;
+        }
+        .batch-textarea {
+            width: 100%;
+            height: 150px;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            background: #fafafa;
+            font-family: inherit;
+            margin-bottom: 10px;
+        }
+        .batch-textarea:focus {
+            background: #fff;
+            border-color: #07C160;
+        }
+
+        ::-webkit-scrollbar { width: 0; height: 0; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="header-title" id="headerTitle">梦角</div>
+        <div class="header-btn" id="openSettingsBtn">设置</div>
+    </div>
+
+    <!-- 聊天内容区 -->
+    <div class="chat-container" id="chatContainer"></div>
+    
+    <!-- 正在输入提示 -->
+    <div class="typing-indicator" id="typingIndicator">正在输入...</div>
+
+    <!-- 底部输入框 -->
+    <div class="input-area">
+        <!-- 引用预览条 -->
+        <div class="quote-preview" id="quotePreview">
+            <span id="quotePreviewText"></span>
+            <span class="close-quote" onclick="cancelQuote()">×</span>
+        </div>
+        
+        <div class="input-row">
+            <textarea class="input-box" id="messageInput" rows="1" placeholder="输入消息..."></textarea>
+            <button class="send-btn" id="sendBtn" disabled>发送</button>
+        </div>
+    </div>
+
+    <!-- 长按操作菜单 -->
+    <div class="action-menu-overlay" id="actionMenuOverlay">
+        <div class="action-menu">
+            <div class="action-item" onclick="handleQuoteAction()">
+                <div class="action-icon">
+                    <!-- 引用图标 -->
+                    <svg viewBox="0 0 24 24"><path d="M6 17h3l2-4V7H5v6h3l-2 4zm8 0h3l2-4V7h-6v6h3l-2 4z"/></svg>
+                </div>
+                引用
+            </div>
+            <div class="action-item delete" onclick="handleDeleteAction()">
+                <div class="action-icon">
+                    <!-- 删除图标 -->
+                    <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </div>
+                删除
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 设置页面模块 ================= -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="settings-page">
+            
+            <!-- 1. 设置主菜单 -->
+            <div class="settings-header" id="mainSettingsHeader">
+                <span class="back-btn" onclick="closeSettings()">
+                    <svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                    返回
+                </span>
+                <h3>设置</h3>
+            </div>
+            <div class="settings-body">
+                <div class="setting-list">
+                    <div class="setting-item" onclick="switchSubPage('avatarPage')">
+                        <div class="setting-text">
+                            <span class="setting-title">角色头像及名称</span>
+                            <span class="setting-subtitle">设置角色和你的头像、昵称</span>
+                        </div>
+                        <div class="setting-arrow">></div>
+                    </div>
+                    
+                    <div class="setting-item" onclick="switchSubPage('cardsPage')">
+                        <div class="setting-text">
+                            <span class="setting-title">字卡管理</span>
+                            <span class="setting-subtitle">管理角色的专属回复字卡</span>
+                        </div>
+                        <div class="setting-arrow">></div>
+                    </div>
+                    
+                    <div class="setting-item" onclick="switchSubPage('delayPage')">
+                        <div class="setting-text">
+                            <span class="setting-title">回复频率</span>
+                            <span class="setting-subtitle">设置角色回复的等待时间范围</span>
+                        </div>
+                        <div class="setting-arrow">></div>
+                    </div>
+                    
+                    <div class="setting-item" onclick="switchSubPage('bgPage')">
+                        <div class="setting-text">
+                            <span class="setting-title">聊天背景</span>
+                            <span class="setting-subtitle">更换沉浸式聊天背景图</span>
+                        </div>
+                        <div class="setting-arrow">></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 头像及昵称子页面 -->
+            <div class="sub-page" id="avatarPage">
+                <div class="settings-header">
+                    <span class="back-btn" onclick="switchSubPage('main')">
+                        <svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                        返回
+                    </span>
+                    <h3>角色头像及名称</h3>
+                </div>
+                <div class="settings-body">
+                    <div class="form-group" style="margin-top: 10px;">
+                        <div class="form-row" style="justify-content: center; padding-bottom: 20px; border-bottom: none;">
+                            <label class="avatar-upload" style="width: 80px; height: 80px; border-radius: 50%;" id="taAvatarPreview">
+                                <span style="pointer-events: none;">上传头像</span>
+                                <input type="file" id="taAvatarInput" accept="image/*">
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-label">角色名称</div>
+                            <input type="text" class="form-input" id="taNameInput" placeholder="梦角">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="form-row" style="justify-content: center; padding-bottom: 20px; border-bottom: none;">
+                            <label class="avatar-upload" style="width: 80px; height: 80px; border-radius: 50%;" id="userAvatarPreview">
+                                <span style="pointer-events: none;">上传头像</span>
+                                <input type="file" id="userAvatarInput" accept="image/*">
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-label">我的昵称</div>
+                            <input type="text" class="form-input" id="userNameInput" placeholder="我">
+                        </div>
+                    </div>
+                    <button class="btn-primary" onclick="saveAvatarAndName()">保存修改</button>
+                </div>
+            </div>
+
+            <!-- 3. 字卡管理子页面 -->
+            <div class="sub-page" id="cardsPage">
+                <div class="settings-header">
+                    <span class="back-btn" onclick="switchSubPage('main')">
+                        <svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                        返回
+                    </span>
+                    <h3>字卡管理</h3>
+                </div>
+                <div class="settings-body">
+                    
+                    <div class="batch-import-box">
+                        <div class="batch-title">批量添加回复</div>
+                        <div class="batch-subtitle">每行一条，自动去重</div>
+                        <textarea class="batch-textarea" id="batchCardsInput" placeholder="在此粘贴内容，每行一条..."></textarea>
+                        <button class="btn-primary" style="margin-top: 0; padding: 10px; font-size: 15px;" onclick="batchAddCards()">批量导入</button>
+                    </div>
+
+                    <div class="card-input-group">
+                        <input type="text" class="card-input" id="newCardInput" placeholder="手动输入单条字卡...">
+                        <button class="add-card-btn" onclick="addCard()">添加</button>
+                    </div>
+
+                    <div class="card-list" id="cardList"></div>
+
+                </div>
+            </div>
+
+            <!-- 4. 回复频率子页面 -->
+            <div class="sub-page" id="delayPage">
+                <div class="settings-header">
+                    <span class="back-btn" onclick="switchSubPage('main')">
+                        <svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                        返回
+                    </span>
+                    <h3>回复频率</h3>
+                </div>
+                <div class="settings-body">
+                    <div class="form-group" style="margin-top: 10px;">
+                        <div class="form-row">
+                            <div class="form-label">最快回复</div>
+                            <input type="number" class="form-input" id="minDelayInput" placeholder="1" min="0" step="0.5"> 
+                            <span style="color:#666; font-size:14px; margin-left:8px;">秒</span>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-label">最慢回复</div>
+                            <input type="number" class="form-input" id="maxDelayInput" placeholder="3" min="0" step="0.5">
+                            <span style="color:#666; font-size:14px; margin-left:8px;">秒</span>
+                        </div>
+                    </div>
+                    <p style="font-size: 13px; color: #999; line-height: 1.5; padding: 0 10px;">
+                        提示：发送消息后，TA 会在设定的最快和最慢时间之间随机延迟出现“正在输入...”并回复你。
+                    </p>
+                    <button class="btn-primary" style="margin-top: 20px;" onclick="saveDelaySettings()">保存修改</button>
+                </div>
+            </div>
+
+            <!-- 5. 聊天背景子页面 -->
+            <div class="sub-page" id="bgPage">
+                <div class="settings-header">
+                    <span class="back-btn" onclick="switchSubPage('main')">
+                        <svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                        返回
+                    </span>
+                    <h3>聊天背景</h3>
+                </div>
+                <div class="settings-body">
+                    <div class="form-group" style="padding: 20px; text-align: center;">
+                        <label class="avatar-upload" style="width: 120px; height: 200px; border-radius: 12px; margin: 0 auto; margin-bottom: 20px;" id="bgPreview">
+                            <span style="pointer-events: none;">点击上传背景图</span>
+                            <input type="file" id="bgInput" accept="image/*">
+                        </label>
+                        <button class="btn-primary" style="background:#ff3b30;" onclick="resetBg()">恢复默认背景</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 状态与配置 ---
+    let chatHistory = [];
+    let cards = [];
+    let currentActionMsgIndex = -1; // 当前长按选中的消息索引
+    let currentQuoteMsg = null;     // 当前引用的消息对象
+
+    const defaultSettings = {
+        userName: "我",
+        taName: "梦角",
+        userAvatar: "", 
+        taAvatar: "",
+        chatBg: "",
+        minDelay: 1,
+        maxDelay: 3
+    };
+    
+    let currentSettings = { ...defaultSettings };
+
+    // --- DOM 元素 ---
+    const chatContainer = document.getElementById('chatContainer');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const typingIndicator = document.getElementById('typingIndicator');
+    const headerTitle = document.getElementById('headerTitle');
+    const settingsModal = document.getElementById('settingsModal');
+    
+    // 引用预览相关
+    const quotePreview = document.getElementById('quotePreview');
+    const quotePreviewText = document.getElementById('quotePreviewText');
+
+    // 长按菜单
+    const actionMenuOverlay = document.getElementById('actionMenuOverlay');
+
+    // --- 初始化 ---
+    function init() {
+        loadData();
+        applySettings();
+        renderChatHistory();
+        setupEventListeners();
+        scrollToBottom();
+    }
+
+    // --- 本地存储 ---
+    function loadData() {
+        const savedHistory = localStorage.getItem('chat_history');
+        const savedCards = localStorage.getItem('ta_cards');
+        const savedSettings = localStorage.getItem('chat_settings');
+        
+        if (savedHistory) chatHistory = JSON.parse(savedHistory);
+        if (savedCards) cards = JSON.parse(savedCards);
+        if (savedSettings) {
+            currentSettings = { ...defaultSettings, ...JSON.parse(savedSettings) };
+        }
+    }
+
+    function saveAllData() {
+        try {
+            localStorage.setItem('chat_history', JSON.stringify(chatHistory));
+            localStorage.setItem('ta_cards', JSON.stringify(cards));
+            localStorage.setItem('chat_settings', JSON.stringify(currentSettings));
+        } catch (e) {
+            alert("本地存储空间已满！可能是图片太大，请尝试上传小一点的图片或删除部分聊天记录。");
+            console.error("Storage Error:", e);
+        }
+    }
+
+    // --- 核心 UI 应用 ---
+    function applySettings() {
+        headerTitle.textContent = currentSettings.taName;
+        document.title = "与 " + currentSettings.taName + " 的聊天";
+        
+        if (currentSettings.chatBg) {
+            chatContainer.style.backgroundImage = `url(${currentSettings.chatBg})`;
+        } else {
+            chatContainer.style.backgroundImage = 'none';
+            chatContainer.style.backgroundColor = '#EDEDED';
+        }
+    }
+
+    // --- 聊天渲染 ---
+    function renderChatHistory() {
+        chatContainer.innerHTML = '';
+        chatHistory.forEach((msg, index) => appendMessageToUI(msg, index));
+    }
+
+    function appendMessageToUI(msg, index) {
+        const row = document.createElement('div');
+        row.className = `message-row ${msg.sender}`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = `avatar ${msg.sender}`;
+        
+        const isUser = msg.sender === 'user';
+        const avatarImg = isUser ? currentSettings.userAvatar : currentSettings.taAvatar;
+        const name = isUser ? currentSettings.userName : currentSettings.taName;
+        
+        if (avatarImg) {
+            avatar.innerHTML = `<img src="${avatarImg}" alt="avatar">`;
+        } else {
+            avatar.textContent = name ? name.charAt(0).toUpperCase() : (isUser ? '我' : 'TA');
+        }
+
+        const bubble = document.createElement('div');
+        bubble.className = `bubble ${msg.sender}`;
+        
+        // 组装气泡内容：如果有引用，先渲染引用块
+        let innerHTML = '';
+        if (msg.quote) {
+            innerHTML += `<div class="quote-box">${msg.quote.senderName}：${msg.quote.text}</div>`;
+        }
+        innerHTML += `<span style="word-break: break-word;">${msg.text}</span>`;
+        bubble.innerHTML = innerHTML;
+
+        // --- 绑定长按事件 ---
+        let pressTimer = null;
+        // 手机端长按
+        bubble.addEventListener('touchstart', (e) => {
+            pressTimer = setTimeout(() => {
+                e.preventDefault(); // 阻止滚动
+                showActionMenu(index);
+            }, 500); // 500ms 触发长按
+        });
+        bubble.addEventListener('touchend', () => clearTimeout(pressTimer));
+        bubble.addEventListener('touchmove', () => clearTimeout(pressTimer));
+        // 电脑端长按 (鼠标按住)
+        bubble.addEventListener('mousedown', (e) => {
+            if (e.button === 0) { // 左键
+                pressTimer = setTimeout(() => {
+                    showActionMenu(index);
+                }, 500);
+            }
+        });
+        bubble.addEventListener('mouseup', () => clearTimeout(pressTimer));
+        bubble.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+
+        row.appendChild(avatar);
+        row.appendChild(bubble);
+        chatContainer.appendChild(row);
+    }
+
+    function scrollToBottom() {
+        setTimeout(() => {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }, 50);
+    }
+
+    // --- 长按菜单逻辑 ---
+    function showActionMenu(index) {
+        currentActionMsgIndex = index;
+        actionMenuOverlay.classList.add('active');
+        // 添加轻微震动反馈 (支持该 API 的手机)
+        if (navigator.vibrate) navigator.vibrate(50);
+    }
+
+    // 关闭菜单
+    actionMenuOverlay.addEventListener('click', (e) => {
+        if (e.target === actionMenuOverlay) {
+            actionMenuOverlay.classList.remove('active');
+            currentActionMsgIndex = -1;
+        }
+    });
+
+    // 引用操作
+    function handleQuoteAction() {
+        if (currentActionMsgIndex === -1) return;
+        const msg = chatHistory[currentActionMsgIndex];
+        const senderName = msg.sender === 'user' ? currentSettings.userName : currentSettings.taName;
+        
+        // 记录引用状态
+        currentQuoteMsg = {
+            text: msg.text,
+            senderName: senderName
+        };
+
+        // 更新 UI 预览
+        quotePreviewText.textContent = `${senderName}：${msg.text}`;
+        quotePreview.classList.add('active');
+        
+        // 关闭菜单并聚焦输入框
+        actionMenuOverlay.classList.remove('active');
+        messageInput.focus();
+    }
+
+    // 取消引用
+    function cancelQuote() {
+        currentQuoteMsg = null;
+        quotePreview.classList.remove('active');
+        quotePreviewText.textContent = '';
+    }
+
+    // 删除操作
+    function handleDeleteAction() {
+        if (currentActionMsgIndex === -1) return;
+        if (confirm("确定要删除这条消息吗？")) {
+            chatHistory.splice(currentActionMsgIndex, 1);
+            saveAllData();
+            renderChatHistory();
+            scrollToBottom();
+        }
+        actionMenuOverlay.classList.remove('active');
+        currentActionMsgIndex = -1;
+    }
+
+    // --- 发送消息逻辑 ---
+    function sendMessage() {
+        const text = messageInput.value.trim();
+        if (!text) return;
+
+        const userMsg = { 
+            sender: 'user', 
+            text: text, 
+            time: Date.now() 
+        };
+
+        // 如果有引用，附带引用数据
+        if (currentQuoteMsg) {
+            userMsg.quote = { ...currentQuoteMsg };
+            cancelQuote(); // 发送后清空引用状态
+        }
+
+        chatHistory.push(userMsg);
+        
+        // 局部更新 UI
+        appendMessageToUI(userMsg, chatHistory.length - 1);
+        saveAllData();
+        
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        sendBtn.disabled = true;
+        scrollToBottom();
+
+        triggerTaReply();
+    }
+
+    // --- TA 回复逻辑 ---
+    function triggerTaReply() {
+        if (cards.length === 0) {
+            alert("字卡库为空，请点击右上角【设置】->【字卡管理】中添加内容。");
+            return;
+        }
+
+        typingIndicator.textContent = `${currentSettings.taName} 正在输入...`;
+        typingIndicator.style.display = 'block';
+        scrollToBottom();
+
+        const minMs = currentSettings.minDelay * 1000;
+        const maxMs = currentSettings.maxDelay * 1000;
+        const safeMax = Math.max(minMs, maxMs); 
+        const safeMin = Math.min(minMs, maxMs);
+        
+        const delay = Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin;
+
+        setTimeout(() => {
+            typingIndicator.style.display = 'none';
+            const randomIndex = Math.floor(Math.random() * cards.length);
+            const taMsg = { 
+                sender: 'ta', 
+                text: cards[randomIndex], 
+                time: Date.now() 
+            };
+            
+            chatHistory.push(taMsg);
+            appendMessageToUI(taMsg, chatHistory.length - 1);
+            saveAllData();
+            scrollToBottom();
+        }, delay);
+    }
+
+    // ==================== 设置页面逻辑 ====================
+
+    document.getElementById('openSettingsBtn').addEventListener('click', () => {
+        document.getElementById('userNameInput').value = currentSettings.userName;
+        document.getElementById('taNameInput').value = currentSettings.taName;
+        document.getElementById('minDelayInput').value = currentSettings.minDelay;
+        document.getElementById('maxDelayInput').value = currentSettings.maxDelay;
+        
+        document.getElementById('userAvatarPreview').innerHTML = currentSettings.userAvatar ? `<img src="${currentSettings.userAvatar}"><input type="file" id="userAvatarInput" accept="image/*">` : '<span style="pointer-events: none;">上传头像</span><input type="file" id="userAvatarInput" accept="image/*">';
+        document.getElementById('taAvatarPreview').innerHTML = currentSettings.taAvatar ? `<img src="${currentSettings.taAvatar}"><input type="file" id="taAvatarInput" accept="image/*">` : '<span style="pointer-events: none;">上传头像</span><input type="file" id="taAvatarInput" accept="image/*">';
+        document.getElementById('bgPreview').innerHTML = currentSettings.chatBg ? `<img src="${currentSettings.chatBg}"><input type="file" id="bgInput" accept="image/*">` : '<span style="pointer-events: none;">点击上传背景</span><input type="file" id="bgInput" accept="image/*">';
+        
+        bindUploadEvents();
+        renderCards();
+        settingsModal.classList.add('active');
+    });
+
+    function closeSettings() {
+        settingsModal.classList.remove('active');
+        setTimeout(() => switchSubPage('main'), 300); 
+    }
+
+    function switchSubPage(pageId) {
+        const subPages = document.querySelectorAll('.sub-page');
+        if (pageId === 'main') {
+            subPages.forEach(p => p.classList.remove('active'));
+        } else {
+            const targetPage = document.getElementById(pageId);
+            if(targetPage) targetPage.classList.add('active');
+        }
+    }
+
+    // --- 保存头像与昵称 ---
+    function saveAvatarAndName() {
+        currentSettings.userName = document.getElementById('userNameInput').value.trim() || "我";
+        currentSettings.taName = document.getElementById('taNameInput').value.trim() || "梦角";
+        
+        saveAllData();
+        applySettings();
+        renderChatHistory();
+        switchSubPage('main');
+    }
+
+    // --- 保存回复频率 ---
+    function saveDelaySettings() {
+        let minV = parseFloat(document.getElementById('minDelayInput').value);
+        let maxV = parseFloat(document.getElementById('maxDelayInput').value);
+        
+        if (isNaN(minV) || minV < 0) minV = 1;
+        if (isNaN(maxV) || maxV < 0) maxV = 3;
+        
+        currentSettings.minDelay = minV;
+        currentSettings.maxDelay = maxV;
+        
+        saveAllData();
+        alert(`已保存！TA将随机在 ${minV}~${maxV} 秒内回复。`);
+        switchSubPage('main');
+    }
+
+    // --- 聊天背景重置 ---
+    function resetBg() {
+        currentSettings.chatBg = "";
+        document.getElementById('bgPreview').innerHTML = '<span style="pointer-events: none;">点击上传背景</span><input type="file" id="bgInput" accept="image/*">';
+        bindUploadEvents();
+        saveAllData();
+        applySettings();
+    }
+
+    // --- 字卡管理逻辑 ---
+    function renderCards() {
+        const cardList = document.getElementById('cardList');
+        cardList.innerHTML = '';
+        if (cards.length === 0) {
+            cardList.innerHTML = '<div style="text-align:center; color:#999; font-size:14px; margin-top:20px;">暂无字卡，请在上方添加</div>';
+            return;
+        }
+        const reversedCards = [...cards].reverse();
+        reversedCards.forEach((text, index) => {
+            const realIndex = cards.length - 1 - index;
+            const item = document.createElement('div');
+            item.className = 'card-item';
+            item.innerHTML = `<span style="word-break: break-all;">${text}</span><button class="delete-card-btn" onclick="deleteCard(${realIndex})">删除</button>`;
+            cardList.appendChild(item);
+        });
+    }
+
+    function addCard() {
+        const input = document.getElementById('newCardInput');
+        const text = input.value.trim();
+        if (!text) return;
+        if (cards.includes(text)) { alert("该字卡已存在！"); return; }
+        
+        cards.push(text);
+        saveAllData();
+        renderCards();
+        input.value = '';
+        input.focus();
+    }
+
+    function batchAddCards() {
+        const textarea = document.getElementById('batchCardsInput');
+        const text = textarea.value;
+        if (!text.trim()) return;
+
+        let lines = text.split('\n');
+        lines = lines.map(line => line.trim()).filter(line => line !== '');
+        if (lines.length === 0) return;
+
+        const originalLength = cards.length;
+        const combined = [...cards, ...lines];
+        const uniqueCards = [...new Set(combined)];
+        
+        const addedCount = uniqueCards.length - originalLength;
+        
+        cards = uniqueCards;
+        saveAllData();
+        renderCards();
+        textarea.value = '';
+        
+        if (addedCount > 0) {
+            alert(`成功导入 ${addedCount} 条新字卡！\n(已自动过滤重复和空行)`);
+        } else {
+            alert(`未添加新字卡，内容可能已存在或全部为空。`);
+        }
+    }
+
+    window.deleteCard = function(index) {
+        if(confirm("确定要删除这条字卡吗？")) {
+            cards.splice(index, 1);
+            saveAllData();
+            renderCards();
+        }
+    }
+
+    // --- 图片上传与压缩核心逻辑 ---
+    function bindUploadEvents() {
+        const taInput = document.getElementById('taAvatarInput');
+        if (taInput) {
+            taInput.onchange = function(e) {
+                if (e.target.files && e.target.files[0]) {
+                    compressImage(e.target.files[0], 200, 200, (base64) => {
+                        currentSettings.taAvatar = base64;
+                        document.getElementById('taAvatarPreview').innerHTML = `<img src="${base64}"><input type="file" id="taAvatarInput" accept="image/*">`;
+                        bindUploadEvents();
+                        saveAllData();
+                        renderChatHistory();
+                    });
+                }
+            };
+        }
+
+        const userInput = document.getElementById('userAvatarInput');
+        if (userInput) {
+            userInput.onchange = function(e) {
+                if (e.target.files && e.target.files[0]) {
+                    compressImage(e.target.files[0], 200, 200, (base64) => {
+                        currentSettings.userAvatar = base64;
+                        document.getElementById('userAvatarPreview').innerHTML = `<img src="${base64}"><input type="file" id="userAvatarInput" accept="image/*">`;
+                        bindUploadEvents();
+                        saveAllData();
+                        renderChatHistory();
+                    });
+                }
+            };
+        }
+
+        const bgInput = document.getElementById('bgInput');
+        if (bgInput) {
+            bgInput.onchange = function(e) {
+                if (e.target.files && e.target.files[0]) {
+                    compressImage(e.target.files[0], 800, 1200, (base64) => {
+                        currentSettings.chatBg = base64;
+                        document.getElementById('bgPreview').innerHTML = `<img src="${base64}"><input type="file" id="bgInput" accept="image/*">`;
+                        bindUploadEvents();
+                        saveAllData();
+                        applySettings();
+                    });
+                }
+            };
+        }
+    }
+
+    function compressImage(file, maxWidth, maxHeight, callback) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = function (event) {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = function () {
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+                if (height > maxHeight) {
+                    width = Math.round((width * maxHeight) / height);
+                    height = maxHeight;
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                callback(compressedBase64);
+            }
+            img.onerror = function() { alert("图片读取失败，请尝试换一张图片。"); }
+        }
+        reader.onerror = function() { alert("文件读取失败，请检查相册权限。"); }
+    }
+
+    // --- 通用事件绑定 ---
+    function setupEventListeners() {
+        messageInput.addEventListener('input', function() {
+            sendBtn.disabled = this.value.trim().length === 0;
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!sendBtn.disabled) sendMessage();
+            }
+        });
+        sendBtn.addEventListener('click', sendMessage);
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                window.scrollTo(0, 0);
+                scrollToBottom();
+            });
+        }
+        
+        bindUploadEvents();
+    }
+
+    // 启动
+    init();
+</script>
+</body>
+</html>
